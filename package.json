@@ -2,7 +2,7 @@
   "name": "light-promise-js",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "bin/$promise.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc && npm run bundle && npm run bundle-min ",
