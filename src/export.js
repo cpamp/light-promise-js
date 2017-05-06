@@ -1,0 +1,1 @@
+window.$Promise = window.$Promise || require("../bin/$promise.js").$Promise;
