@@ -2,13 +2,14 @@
   "name": "light-promise-js",
   "version": "1.0.0",
   "description": "",
-  "main": "bin/$promise.js",
+  "main": "./bin/$promise.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc && npm run bundle && npm run bundle-min ",
     "bundle": "webpack src/export.js bin/bundle/$promise.bundle.js",
     "bundle-min": "webpack src/export.js bin/bundle/$promise.bundle.min.js --optimize-minimize"
   },
+  "types": "bin/$promise.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cpamp/light-promise-js.git"

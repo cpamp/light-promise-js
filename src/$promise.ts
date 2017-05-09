@@ -1,8 +1,16 @@
-var $states = {
-    pending:    0
-    ,resolved:  1
-    ,rejected:  2
+enum State {
+    pending =    0,
+    resolved =   1,
+    rejected =   2
 };
+
+interface IDeferred {
+    resolved(data:any),
+    rejected(data:any),
+    resolve(data:any),
+    reject(data:any),
+    caught: boolean
+}
 
 export interface IResultCallback {
     (result: any)
@@ -13,25 +21,30 @@ export interface ICallback {
 }
 
 export class $Promise {
-    private data;
-    private deferred;
-    private state = $states.pending;
+    private value: any;
+    private deferred: IDeferred;
+    private state: State = State.pending;
 
     constructor(callback: ICallback) {
-        callback((data) => { this.resolve(data); },
-                 (data) => { this.reject(data); });
+        try {
+            if (typeof callback === 'function') callback(data => this.resolve(data), data => this.reject(data));
+            else this.resolve();
+        } catch(e) {
+            this.value = e;
+            this.reject(e);
+        }
     }
 
-    resolve(data: any) {
+    resolve(data?: any) {
+        if (this.state !== State.pending) return;
         try {
             if(data && typeof data.then === 'function') {
-                data.then((data) => { this.resolve(data); },
-                          (data) => { this.reject(data); });
+                data.then(d => this.resolve(d), d => this.reject(d));
                 return;
             }
 
-            this.data = data;
-            this.state = $states.resolved;
+            this.value = data;
+            this.state = State.resolved;
             if(this.deferred) {
                 this.handle(this.deferred);
             }
@@ -40,62 +53,69 @@ export class $Promise {
         }
     }
 
-    reject(data: any) {
-        this.data = data;
-        this.state = $states.rejected;
+    reject(data?: any) {
+        if (this.state !== State.pending) return;
+
+        this.value = data;
+        this.state = State.rejected;
         if(this.deferred) {
             this.handle(this.deferred);
         }
     }
 
-    handle(deferred: any) {
-        if(this.state === $states.pending) {
+    private handle(deferred: IDeferred) {
+        if(this.state === State.pending) {
             this.deferred = deferred;
             return;
         }
 
         setTimeout(() => {
-            var callback;
-            if(this.state === $states.resolved) {
-                callback = deferred.$$resolved;
-            } else if(this.state === $states.rejected) {
-                callback = deferred.$$rejected;
-            }
-
-            if(!callback) {
-                if(this.state === $states.resolved) {
-                    deferred.$$resolve(this.data);
-                } else if(this.state === $states.rejected) {
-                    deferred.$$reject(this.data);
+            if(this.state === State.resolved && typeof deferred.resolved === 'function') {
+                try {
+                    var r = deferred.resolved(this.value);
+                    deferred.resolve(r || this.value);
+                } catch(e) {
+                    deferred.reject(e);
+                }
+            } else if(this.state === State.rejected && typeof deferred.rejected === 'function') {
+                try {
+                    var r = deferred.rejected(this.value);
+                    if (deferred.caught === true) deferred.resolve(r || this.value);
+                    else deferred.reject(r || this.value)
+                } catch(e) {
+                    deferred.reject(e);
                 }
             } else {
-                try {
-                    var r = callback(this.data);
-                    deferred.$$resolve(r);
-                } catch(e) {
-                    deferred.$$reject(e);
+                if(this.state === State.resolved) {
+                    deferred.resolve(this.value);
+                } else if(this.state === State.rejected) {
+                    deferred.reject(this.value);
                 }
             }
         });
     }
 
-    then(resolved: IResultCallback, rejected: IResultCallback) {
+    then(resolved?: IResultCallback, rejected?: IResultCallback) {
         return new $Promise((resolve, reject) => {
             this.handle({
-                $$resolved: resolved
-                ,$$rejected: rejected
-                ,$$resolve: resolve
-                ,$$reject: reject
+                resolved: resolved,
+                rejected: rejected,
+                resolve: resolve,
+                reject: reject,
+                caught: false
             });
-        });
+        });;
     }
 
-    done(resolved: IResultCallback, rejected: IResultCallback) {
-        this.handle({
-            $$resolved: resolved
-            ,$$rejected: rejected
-            ,$$resolve: this.resolve
-            ,$$reject: this.reject
-        });
+    catch(rejected: IResultCallback) {
+        return new $Promise((resolve, reject) => {
+            this.handle({
+                resolved: null,
+                rejected: rejected,
+                resolve: resolve,
+                reject: reject,
+                caught: true
+            });
+        })
     }
 }
